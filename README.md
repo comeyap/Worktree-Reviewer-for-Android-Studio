@@ -78,15 +78,70 @@ AI 에이전트를 모니터링하거나 복잡한 메타데이터 결합 대신
 
 ---
 
-## 👾 로컬 빌드 및 수동 플러그인 구동 방법
+## 👾 로컬 빌드 및 안드로이드 스튜디오(Android Studio) 설치 방법
 
-개발 장비에 IntelliJ IDEA 및 필요한 JDK 17 버전이 설정되어 있다면, 아래 과정으로 즉시 시제품을 디버깅 및 실행해볼 수 있습니다.
+제시된 코드는 플러그인의 **전체 소스코드**입니다. 실제 동작하는 플러그인 형태로 안드로이드 스튜디오에 직접 설치하려면, 소스코드를 컴파일하여 **플러그인 배포용 압축 파일(`.zip` 또는 `.jar`)**을 생성해야 합니다.
+
+### 📦 1단계: 플러그인 설치 파일(.zip) 빌드하기
+개발 장비에 IntelliJ/Android Studio 개발 환경과 JDK 17 버전이 설정되어 있다면 바로 빌드할 수 있습니다.
 
 1.  IntelliJ IDEA를 실행한 후 **[New Project] → [IDE Plugin]**으로 신규 프로젝트를 생성합니다. (Kotlin DSL Gradle 프로젝트 설정 권장)
-2.  본 에뮬레이터의 `Plugin Kotlin Code` 탭 소스코드를 적합한 디렉토리 위치에 붙여넣습니다. (특히 `plugin.xml`은 `src/main/resources/META-INF` 하위에 위치해야 함)
-3.  우측 Gradle 툴 윈도우에서 **[Tasks] → [intellij] → [runIde]**를 더블 클릭하거나 터미널에서 다음 명령어를 실행합니다:
+2.  본 에뮬레이터의 `Plugin Kotlin Code` 탭 소스코드를 프로젝트의 지정된 경로에 각각 붙여넣습니다.
+    *   `build.gradle.kts`는 루트 디렉토리에 덮어씌웁니다.
+    *   `plugin.xml`은 `src/main/resources/META-INF/` 하위에 위치시킵니다.
+    *   Kotlin 파일들은 `src/main/kotlin/com/example/worktree/` 패키지 하위에 구성합니다.
+3.  프로젝트 루트 터미널에서 다음 Gradle 명령어(플러그인 패키징 공식 명령)를 실행합니다:
     ```bash
-    ./gradlew runIde
+    ./gradlew buildPlugin
     ```
-4.  실행이 완료되면 디버그용 임시 Android Studio 인스턴스가 생성되어 부팅됩니다.
-5.  해당 가상 IDE에서 Git 프로젝트를 로드한 뒤 `Alt + Shift + W` 키를 입력하거나 우측의 `Active Worktrees` 도크를 클릭하여 즉시 리뷰 생산성 혜택을 직접 즐겨보실 수 있습니다!
+4.  빌드가 완료되면 **`build/distributions/`** 디렉토리 하위에 **`AI-Worktree-Reviewer-1.0.0.zip`** 형태의 플러그인 최종 배포 파일이 생성됩니다. 이 파일이 안드로이드 스튜디오에 직접 업로드하여 바로 쓸 수 있는 **플러그인 설치용 파일**입니다!
+
+---
+
+### 💻 2단계: 안드로이드 스튜디오에 직접 설치하기
+빌드된 `.zip` 파일을 사용해 안드로이드 스튜디오에 수동 설치 방법은 다음과 같습니다:
+
+1.  안드로이드 스튜디오(Android Studio)를 엽니다.
+2.  상단 메뉴에서 **Settings** (Windows/Linux: `File` -> `Settings` 또는 `Ctrl+Alt+S` / macOS: `Android Studio` -> `Settings...` 또는 `Cmd+,`)를 엽니다.
+3.  좌측 메뉴에서 **Plugins**를 클릭합니다.
+4.  우측 상단의 **톱니바퀴 아이콘(⚙️)**을 클릭한 뒤, **"Install Plugin from Disk..."**를 선택합니다.
+5.  앞선 단계에서 빌드하여 생성된 `build/distributions/AI-Worktree-Reviewer-1.0.0.zip` 파일을 찾아 선택합니다.
+6.  **Apply** 버튼을 누르고 안드로이드 스튜디오를 **재시작(Restart IDE)** 해줍니다.
+7.  이제 키맵 단축키 `Alt + Shift + W`를 입력하면 Android Studio 내부에 강력하고 가벼운 **Active Worktrees** 도구가 활성화됩니다!
+
+---
+
+## 🛠️ 개발 팁: 안드로이드 스튜디오(Android Studio) 타겟 개발 상세
+안드로이드 스튜디오는 기본적으로 JetBrains의 IntelliJ Community Platform을 기반으로 작동하므로 완벽하게 호환됩니다.
+
+*   **컴파일 SDK 매핑**: 안드로이드 스튜디오 버전과 매칭되는 IntelliJ Platform 버전을 `build.gradle.kts`에 작성합니다.
+    *   예: **Android Studio Ladybug (2024.2.1)** 은 IntelliJ `2024.2` 기반이므로 `version.set("2024.2")` 로 작성합니다.
+    *   예: **Android Studio Koala (2024.1.1)** 는 IntelliJ `2024.1` 기반이므로 `version.set("2024.1")` 로 작성합니다.
+*   **로컬 디버그 환경**: 로컬에 설치된 Android Studio를 디렉토리로 지정하여 직접 애뮬레이션 실행 및 테스트하고 싶다면 `build.gradle.kts` 의 `intellij { ... }` 블록 내부에 다음 설정을 추가해주면 됩니다.
+    ```kotlin
+    intellij {
+        // 본인의 OS에 맞게 설치된 Android Studio 경로 입력
+        localPath.set("/Applications/Android Studio.app") // macOS 예시
+        // localPath.set("C:\\Program Files\\Android\\Android Studio") // Windows 예시
+    }
+    ```
+
+---
+
+## 🤖 GitHub Actions로 자동 빌드 및 배포하기 (가장 편리한 방법 🌟)
+
+가장 권장하는 방식은 **GitHub Actions**를 사용하여 GitHub 클라우드에서 플러그인 파일을 자동으로 컴파일하고 배포하는 것입니다. 이렇게 하면 개발 PC에 Java나 Gradle, IntelliJ 등을 복잡하게 설치하지 않고도 항상 최신 플러그인 ZIP 파일을 얻을 수 있습니다.
+
+이미 이 레포지토리의 `.github/workflows/build-plugin.yml`에 자동 빌드 구성이 완벽히 세팅되어 제공됩니다!
+
+### ⚙️ 동작 방식 & 다운로드하는 법
+
+1. **자동 빌드 (Push / Pull Request)**
+   * 코드를 업데이트하여 GitHub의 `main` 혹은 `master` 브랜치로 `git push`를 하면, GitHub Actions가 백그라운드에서 자동으로 빌드를 수행합니다.
+   * **다운로드**: GitHub Repository 내의 **[Actions]** 탭 -> 최신 빌드 Workflow 클릭 -> 하단 **Artifacts** 섹션에서 빌드된 `AI-Worktree-Reviewer-Artifact` ZIP 파일을 다운로드할 수 있습니다!
+
+2. **작업물 공식 배포 (GitHub Release - 강력 추천)**
+   * GitHub에서 새로운 **Release**(태그 생성)를 발행하면 자동 빌드가 동작합니다.
+   * 빌드가 즉시 완료된 후, 자동으로 **해당 Release의 첨부 파일(Release Assets) 항목**에 완벽히 호환되는 최신 플러그인 빌드 ZIP 파일이 업로드됩니다.
+   * 사용자는 웹 브라우저로 Releases 페이지에 와서 `.zip` 파일만 다운받아 안드로이드 스튜디오에 'Install Plugin from Disk'로 넣기만 하면 됩니다.
+

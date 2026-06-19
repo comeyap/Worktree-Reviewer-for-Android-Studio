@@ -1,0 +1,54 @@
+name: Build and Package Plugin
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [ published ]
+
+jobs:
+  build:
+    name: Build & Package
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout repository code
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Set up Java Environment (JDK 17)
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      # 3. Cache Gradle home directory and wrapper to speed up subsequent builds
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v3
+
+      # 4. Grant execution permissions on gradlew wrapper
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
+
+      # 5. Build and verify the IntelliJ/Android Studio plugin
+      # This generates the output in build/distributions/
+      - name: Build Plugin
+        run: ./gradlew buildPlugin
+
+      # 6. Upload the compiled ZIP file in Github Actions Artifacts
+      - name: Upload Plugin Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Worktree-Reviewer-Artifact
+          path: build/distributions/*.zip
+
+      # 7. If this build was triggered by a GitHub Release, automatically upload the zip as a Release Asset
+      - name: Upload Release Asset
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/distributions/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
