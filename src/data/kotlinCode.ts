@@ -14,8 +14,8 @@ export const KOTLIN_PLUGIN_FILES: KotlinFile[] = [
     description: 'Gradle configuration file for compiling the Android Studio / IntelliJ Plugin.',
     content: `plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "1.9.21"
-    id("org.jetbrains.intellij") version "1.16.1"
+    id("org.jetbrains.kotlin.jvm") version "1.9.24"
+    id("org.jetbrains.intellij.platform") version "2.1.0"
 }
 
 group = "com.github.developer"
@@ -23,38 +23,51 @@ version = "1.0.0"
 
 repositories {
     mavenCentral()
+    intellijPlatform {
+        defaultRepositories()
+    }
 }
 
-// Configure IntelliJ platform plugin for Android Studio compatibility
-intellij {
-    // We target 2023.3 (highly stable, supports 'git4idea' cleanly and is fully backward/forward compatible with AS Ladybug, Koala, Jellyfish, Iguana, Hedgehog)
-    version.set("2023.3") 
-    type.set("IC")        // Community Edition (fully compatible with Android Studio)
-    plugins.set(listOf("git4idea", "platform-images"))
-
-    // OR development targeting: point directly to your local Android Studio directory:
-    // localPath.set("/Applications/Android Studio.app") // On macOS
-    // localPath.set("C:\\Program Files\\Android\\Android Studio") // On Windows
+dependencies {
+    intellijPlatform {
+        intellijIdeaCommunity("2024.1")
+        bundledPlugin("com.intellij.git")
+        bundledPlugin("platform-images")
+    }
 }
 
-tasks {
-    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-        kotlinOptions.jvmTarget = "17"
+intellijPlatform {
+    pluginConfiguration {
+        id.set("com.github.developer.aiworktreereviewer")
+        name.set("AI Worktree Reviewer")
+        version.set("1.0.0")
+        
+        patchPluginXml {
+            version.set("1.0.0")
+            sinceBuild.set("241")
+            untilBuild.set("242.*")
+        }
     }
-
-    patchPluginXml {
-        sinceBuild.set("232")
-        untilBuild.set("242.*")
-    }
-
-    signPlugin {
+    
+    signing {
         certificateChain.set(System.getenv("CERTIFICATE_CHAIN"))
         privateKey.set(System.getenv("PRIVATE_KEY"))
         password.set(System.getenv("PRIVATE_KEY_PASSWORD"))
     }
-
-    publishPlugin {
+    
+    publishing {
         token.set(System.getenv("PUBLISH_TOKEN"))
+    }
+}
+
+tasks {
+    withType<JavaCompile> {
+        sourceCompatibility = "17"
+        targetCompatibility = "17"
+    }
+
+    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+        kotlinOptions.jvmTarget = "17"
     }
 }
 `

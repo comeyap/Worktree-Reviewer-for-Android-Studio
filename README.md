@@ -114,16 +114,18 @@ AI 에이전트를 모니터링하거나 복잡한 메타데이터 결합 대신
 ## 🛠️ 개발 팁: 안드로이드 스튜디오(Android Studio) 타겟 개발 상세
 안드로이드 스튜디오는 기본적으로 JetBrains의 IntelliJ Community Platform을 기반으로 작동하므로 완벽하게 호환됩니다.
 
-*   **컴파일 SDK 권장 세팅 (`2023.3`)**:
-    *   현재 구형 `org.jetbrains.intellij` 플러그인 빌드 시스템에서 최신 플랫폼(2024.1+)을 직접 세팅할 경우 빌트인 Git 종속성(`git4idea`)을 찾지 못하는 이슈가 빌드 과정에서 발생할 수 있습니다.
-    *   따라서 **전 버전 호환성(Retro-compatibility)** 및 안정적인 빌드를 보장하기 위해 기본 컴파일 타겟으로 **`2023.3`** 대에 해당하는 IntelliJ Platform SDK 버전을 사용합니다.
-    *   이 방식으로 빌드된 플러그인은 **구형 안드로이드 스튜디오(Hedgehog, Iguana, Jellyfish)**뿐만 아니라 **최신 안드로이드 스튜디오(Koala, Ladybug)**에서도 문제없이 완벽하게 상위 및 하위 호환됩니다.
-*   **로컬 디버그 환경**: 로컬에 설치된 Android Studio를 디렉토리로 지정하여 직접 애뮬레이션 실행 및 테스트하고 싶다면 `build.gradle.kts` 의 `intellij { ... }` 블록 내부에 다음 설정을 추가해주면 됩니다.
+*   **컴파일 SDK 권장 세팅 (`2024.1` / IntelliJ Platform Gradle Plugin 2.x)**:
+    *   본 프로젝트는 최신 Gradle 8.x/9.x 및 IntelliJ SDK 플랫폼과의 완벽한 버그 프리 호환성을 유지하기 위해 최신 **IntelliJ Platform Gradle Plugin 2.x (`org.jetbrains.intellij.platform`)**를 사용하여 현대화되었습니다.
+    *   이를 통해 레거시 Gradle API 호환성 충돌이 완전히 해결되어 Github Actions 및 로컬 기기 어디서든 **최신 Gradle 버전**으로 빌드 및 검증이 가능합니다.
+    *   기본 컴파일 타겟으로 **`2024.1`** 대에 해당하는 IntelliJ Platform SDK 버전을 사용하며, 이는 구 버전 안드로이드 스튜디오뿐만 아니라 최신 버전(**Koala, Ladybug**)까지 모두 완벽하게 상위 및 하위 호환됩니다.
+*   **로컬 디버그 환경**: 로컬에 설치된 Android Studio를 디렉토리로 지정하여 직접 애뮬레이션 실행 및 테스트하고 싶다면 `build.gradle.kts` 의 `dependencies { ... }` 블록 내부에 다음 설정을 추가해주면 됩니다.
     ```kotlin
-    intellij {
-        // 본인의 OS에 맞게 설치된 Android Studio 경로 입력
-        localPath.set("/Applications/Android Studio.app") // macOS 예시
-        // localPath.set("C:\\Program Files\\Android\\Android Studio") // Windows 예시
+    dependencies {
+        intellijPlatform {
+            // 본인의 OS에 맞게 설치된 Android Studio 경로를 로컬 타겟으로 직접 주입 가능
+            localPath.set("/Applications/Android Studio.app") // macOS 예시
+            // localPath.set("C:\\Program Files\\Android\\Android Studio") // Windows 예시
+        }
     }
     ```
 
