@@ -22,6 +22,14 @@ dependencies {
     }
 }
 
+sourceSets {
+    main {
+        java.srcDirs("src/main/java")
+        kotlin.srcDirs("src/main/kotlin")
+        resources.srcDirs("src/main/resources")
+    }
+}
+
 intellijPlatform {
     pluginConfiguration {
         id = "com.github.developer.aiworktreereviewer"
@@ -34,6 +42,13 @@ intellijPlatform {
         }
         
         description = "AI-powered worktree reviewer for Android Studio"
+        changeNotes = "Initial release"
+        
+        vendor {
+            name = "Developer"
+            email = "developer@github.com"
+            url = "https://github.com"
+        }
     }
     
     signing {
