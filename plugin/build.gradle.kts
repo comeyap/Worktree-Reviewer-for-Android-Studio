@@ -18,7 +18,6 @@ dependencies {
     intellijPlatform {
         intellijIdeaCommunity("2024.1")
         bundledPlugin("Git4Idea")
-        bundledPlugin("platform-images")
     }
 }
 
