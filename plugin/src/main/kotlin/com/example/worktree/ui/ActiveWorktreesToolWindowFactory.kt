@@ -2,6 +2,7 @@ package com.example.worktree.ui
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
@@ -60,6 +61,7 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
         }
         val reviewAllButton = JButton("Review all").apply { isEnabled = false }
         val refreshButton = JButton("Refresh")
+        val deleteButton = JButton("Delete").apply { isEnabled = false }
 
         // ----- Behaviour -----
 
@@ -132,9 +134,26 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
             }
         }
 
+        // Removes the selected worktree after confirmation, then reloads the list.
+        fun deleteWorktree(worktree: WorktreeInfo) {
+            val choice = Messages.showYesNoDialog(
+                project,
+                "Remove worktree \"${worktree.name}\"?\n${worktree.path}",
+                "Remove Worktree",
+                Messages.getQuestionIcon()
+            )
+            if (choice != Messages.YES) return
+            app.executeOnPooledThread {
+                service.removeWorktree(worktree.path)
+                app.invokeLater { reloadWorktrees() }
+            }
+        }
+
         worktreeList.addListSelectionListener { e ->
             if (!e.valueIsAdjusting) {
-                worktreeList.selectedValue?.let { loadFilesFor(it) }
+                val selected = worktreeList.selectedValue
+                deleteButton.isEnabled = selected != null
+                selected?.let { loadFilesFor(it) }
             }
         }
         filesList.addListSelectionListener { e ->
@@ -150,6 +169,9 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
             reviewAll(worktree, files)
         }
         refreshButton.addActionListener { reloadWorktrees() }
+        deleteButton.addActionListener {
+            worktreeList.selectedValue?.let { deleteWorktree(it) }
+        }
 
         // ----- Layout -----
         val header = JPanel(BorderLayout()).apply {
@@ -158,8 +180,12 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
             border = JBUI.Borders.emptyBottom(5)
         }
 
+        val worktreeActions = JPanel(FlowLayout(FlowLayout.LEFT, 2, 0)).apply {
+            add(deleteButton)
+        }
         val worktreePanel = JPanel(BorderLayout()).apply {
             add(JBScrollPane(worktreeList), BorderLayout.CENTER)
+            add(worktreeActions, BorderLayout.SOUTH)
         }
         val filesPanel = JPanel(BorderLayout()).apply {
             add(JBLabel("Changed files"), BorderLayout.NORTH)
