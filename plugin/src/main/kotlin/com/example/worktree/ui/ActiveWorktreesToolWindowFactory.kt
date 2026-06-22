@@ -73,13 +73,19 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
         // Reuse a single diff editor tab: close the previous one before opening a
         // new one, so navigating files never stacks duplicate diff windows/tabs.
         var lastDiffFile: VirtualFile? = null
-        fun showDiff(requests: List<SimpleDiffRequest>, title: String) {
+        var lastDiffWorktreePath: String? = null
+        fun closeOpenDiff() {
+            lastDiffFile?.let { if (it.isValid) FileEditorManager.getInstance(project).closeFile(it) }
+            lastDiffFile = null
+            lastDiffWorktreePath = null
+        }
+        fun showDiff(requests: List<SimpleDiffRequest>, title: String, worktreePath: String) {
             if (requests.isEmpty()) return
-            val editorManager = FileEditorManager.getInstance(project)
-            lastDiffFile?.let { if (it.isValid) editorManager.closeFile(it) }
+            closeOpenDiff()
             val diffFile = ChainDiffVirtualFile(SimpleDiffRequestChain(requests), title)
             lastDiffFile = diffFile
-            editorManager.openFile(diffFile, true)
+            lastDiffWorktreePath = worktreePath
+            FileEditorManager.getInstance(project).openFile(diffFile, true)
         }
 
         fun buildRequest(worktree: WorktreeInfo, relativePath: String): SimpleDiffRequest? {
@@ -105,13 +111,13 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
 
         fun openSingleDiff(worktree: WorktreeInfo, relativePath: String) {
             val request = buildRequest(worktree, relativePath) ?: return
-            showDiff(listOf(request), relativePath)
+            showDiff(listOf(request), relativePath, worktree.path)
         }
 
         // Opens every changed file in the one diff tab; page through with prev/next.
         fun reviewAll(worktree: WorktreeInfo, files: List<String>) {
             val requests = files.mapNotNull { buildRequest(worktree, it) }
-            showDiff(requests, "${worktree.name} — all changes")
+            showDiff(requests, "${worktree.name} — all changes", worktree.path)
         }
 
         // Loads the changed files for a worktree; also refreshes its +/- badge.
@@ -162,7 +168,11 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
             if (choice != Messages.YES) return
             app.executeOnPooledThread {
                 service.removeWorktree(worktree.path)
-                app.invokeLater { reloadWorktrees() }
+                app.invokeLater {
+                    // Close the diff tab if it belongs to the worktree being removed.
+                    if (lastDiffWorktreePath == worktree.path) closeOpenDiff()
+                    reloadWorktrees()
+                }
             }
         }
 
