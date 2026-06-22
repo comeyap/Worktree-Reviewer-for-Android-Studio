@@ -1,3 +1,7 @@
+// AUTO-GENERATED FILE — DO NOT EDIT BY HAND.
+// Source of truth: the plugin/ Gradle project.
+// Regenerate with: npm run generate:plugin-code  (see scripts/generate-kotlin-code.mjs)
+
 export interface KotlinFile {
   name: string;
   path: string;
@@ -8,10 +12,10 @@ export interface KotlinFile {
 
 export const KOTLIN_PLUGIN_FILES: KotlinFile[] = [
   {
-    name: 'build.gradle.kts',
-    path: 'build.gradle.kts',
-    language: 'kotlin',
-    description: 'Gradle configuration file for compiling the Android Studio / IntelliJ Plugin.',
+    name: "build.gradle.kts",
+    path: "build.gradle.kts",
+    language: "kotlin",
+    description: "Gradle configuration file for compiling the Android Studio / IntelliJ Plugin.",
     content: `plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "1.9.24"
@@ -32,7 +36,6 @@ dependencies {
     intellijPlatform {
         intellijIdeaCommunity("2024.1")
         bundledPlugin("Git4Idea")
-        bundledPlugin("platform-images")
         instrumentationTools()
     }
 }
@@ -70,13 +73,13 @@ tasks {
         kotlinOptions.jvmTarget = "17"
     }
 }
-`
+`,
   },
   {
-    name: 'plugin.xml',
-    path: 'src/main/resources/META-INF/plugin.xml',
-    language: 'xml',
-    description: 'Declares plugin actions, tool windows, extensions, and standard parameters.',
+    name: "plugin.xml",
+    path: "src/main/resources/META-INF/plugin.xml",
+    language: "xml",
+    description: "Declares plugin actions, tool windows, extensions, and standard parameters.",
     content: `<!-- SPDX-License-Identifier: Apache-2.0 -->
 <idea-plugin>
     <id>com.github.developer.aiworktreereviewer</id>
@@ -121,20 +124,31 @@ tasks {
         </action>
     </actions>
 </idea-plugin>
-`
+`,
   },
   {
-    name: 'ActiveWorktreesToolWindowFactory.kt',
-    path: 'src/main/kotlin/com/example/worktree/ui/ActiveWorktreesToolWindowFactory.kt',
-    language: 'kotlin',
-    description: 'Binds the side panel interface, handles active events and list presentation.',
+    name: "settings.gradle.kts",
+    path: "settings.gradle.kts",
+    language: "kotlin",
+    description: "Gradle settings file declaring the plugin project name.",
+    content: `rootProject.name = "aiworktreereviewer"
+`,
+  },
+  {
+    name: "ActiveWorktreesToolWindowFactory.kt",
+    path: "src/main/kotlin/com/example/worktree/ui/ActiveWorktreesToolWindowFactory.kt",
+    language: "kotlin",
+    description: "Binds the side panel interface, loads the worktree list off the EDT and opens a diff on selection.",
     content: `package com.example.worktree.ui
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 import com.example.worktree.service.WorktreeService
+import com.example.worktree.service.WorktreeInfo
+import com.example.worktree.actions.DiffReviewAction
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBLabel
@@ -142,78 +156,94 @@ import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.FlowLayout
+import java.io.File
 import javax.swing.*
-import javax.swing.border.EmptyBorder
 
 class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val worktreeService = project.getService(WorktreeService::class.java)
-        
+
         val panel = JPanel(BorderLayout())
         panel.border = JBUI.Borders.empty(5)
 
-        // Title and Refresh Control
+        // Title and Refresh control
         val headerPanel = JPanel(BorderLayout())
         val titleLabel = JBLabel("Active Repository Worktrees").apply {
             font = font.deriveFont(java.awt.Font.BOLD, 13f)
         }
         headerPanel.add(titleLabel, BorderLayout.WEST)
 
-        val refreshButton = JButton("Refresh").apply {
-            addActionListener {
-                // Service-controlled reload
-                SwingUtilities.invokeLater {
-                    // Logic to reload JBList model
-                }
-            }
-        }
+        val refreshButton = JButton("Refresh")
         val rightHeader = JPanel(FlowLayout(FlowLayout.RIGHT, 2, 0))
         rightHeader.add(refreshButton)
         headerPanel.add(rightHeader, BorderLayout.EAST)
         headerPanel.border = JBUI.Borders.emptyBottom(5)
         panel.add(headerPanel, BorderLayout.NORTH)
 
-        // Worktree list component
-        val mockModel = DefaultListModel<String>().apply {
-            // Retrieve listed paths outputting from git CLI
-            worktreeService.getWorktrees().forEach {
-                addElement(it.name + " (" + it.branch + ")")
-            }
-        }
-
-        val scrollList = JBList(mockModel).apply {
+        // Worktree list — holds WorktreeInfo so selection handlers can act on it.
+        val listModel = DefaultListModel<WorktreeInfo>()
+        val scrollList = JBList(listModel).apply {
             selectionMode = ListSelectionModel.SINGLE_SELECTION
             cellRenderer = SimpleListCellRenderer.create { label, value, _ ->
-                label.text = value
+                label.text = if (value != null) "\${value.name} (\${value.branch})" else ""
                 label.icon = com.intellij.icons.AllIcons.Nodes.Folder
             }
-            addListSelectionListener { event ->
-                if (!event.valueIsAdjusting) {
-                    // Call diff trigger logic on worktreeService
+        }
+        panel.add(JBScrollPane(scrollList), BorderLayout.CENTER)
+
+        // Open the first modified file of the selected worktree in a side-by-side
+        // diff (Main repository vs. worktree). git diff runs off the EDT.
+        fun openDiff(worktree: WorktreeInfo) {
+            val basePath = project.basePath ?: return
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val modified = worktreeService.getModifiedFiles(worktree.path)
+                ApplicationManager.getApplication().invokeLater {
+                    val relativePath = modified.firstOrNull() ?: return@invokeLater
+                    val mainOriginal = File(basePath, relativePath)
+                    val worktreeModified = File(worktree.path, relativePath)
+                    DiffReviewAction(project, mainOriginal, worktreeModified, relativePath).showDiff()
                 }
             }
         }
+        scrollList.addListSelectionListener { event ->
+            if (!event.valueIsAdjusting) {
+                scrollList.selectedValue?.let { openDiff(it) }
+            }
+        }
 
-        panel.add(JBScrollPane(scrollList), BorderLayout.CENTER)
+        // Load worktrees off the EDT so a slow or hanging git process never
+        // freezes the IDE UI thread; results are applied back on the EDT.
+        fun reload() {
+            refreshButton.isEnabled = false
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val worktrees = worktreeService.getWorktrees()
+                ApplicationManager.getApplication().invokeLater {
+                    listModel.clear()
+                    worktrees.forEach { listModel.addElement(it) }
+                    refreshButton.isEnabled = true
+                }
+            }
+        }
+        refreshButton.addActionListener { reload() }
+        reload()
 
         val content = ContentFactory.getInstance().createContent(panel, "", false)
         toolWindow.contentManager.addContent(content)
     }
 }
-`
+`,
   },
   {
-    name: 'WorktreeService.kt',
-    path: 'src/main/kotlin/com/example/worktree/service/WorktreeService.kt',
-    language: 'kotlin',
-    description: 'Project service dealing directly with git shell processes to fetch active branches and stats.',
+    name: "WorktreeService.kt",
+    path: "src/main/kotlin/com/example/worktree/service/WorktreeService.kt",
+    language: "kotlin",
+    description: "Project service dealing directly with git shell processes to fetch active branches and stats.",
     content: `package com.example.worktree.service
 
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import java.io.File
-import java.io.BufferedReader
-import java.io.InputStreamReader
 
 data class WorktreeInfo(
     val path: String,
@@ -225,47 +255,51 @@ data class WorktreeInfo(
 @Service(Service.Level.PROJECT)
 class WorktreeService(private val project: Project) {
 
+    private val logger = thisLogger()
+
     fun getWorktrees(): List<WorktreeInfo> {
         val rootPath = project.basePath ?: return emptyList()
         val result = mutableListOf<WorktreeInfo>()
-        
+
         try {
-            // Execution of "git worktree list --porcelain"
+            // "git worktree list --porcelain"; stderr is merged into stdout so a
+            // chatty/failing git process can never fill a separate stderr pipe and
+            // deadlock. The stream is always closed via use {}.
             val process = ProcessBuilder("git", "worktree", "list", "--porcelain")
                 .directory(File(rootPath))
+                .redirectErrorStream(true)
                 .start()
-            
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            var line: String? = reader.readLine()
-            
+
             var currentPath = ""
             var currentSha = ""
             var currentBranch = ""
-            
-            while (line != null) {
-                if (line.startsWith("worktree ")) {
-                    if (currentPath.isNotEmpty()) {
-                        result.add(createWorktreeObj(currentPath, currentSha, currentBranch))
+
+            process.inputStream.bufferedReader().use { reader ->
+                reader.forEachLine { line ->
+                    when {
+                        line.startsWith("worktree ") -> {
+                            if (currentPath.isNotEmpty()) {
+                                result.add(createWorktreeObj(currentPath, currentSha, currentBranch))
+                            }
+                            currentPath = line.substring("worktree ".length)
+                            currentSha = ""
+                            currentBranch = ""
+                        }
+                        line.startsWith("HEAD ") -> currentSha = line.substring("HEAD ".length)
+                        line.startsWith("branch ") ->
+                            currentBranch = line.substring("branch ".length).removePrefix("refs/heads/")
                     }
-                    currentPath = line.substring("worktree ".length)
-                    currentSha = ""
-                    currentBranch = ""
-                } else if (line.startsWith("HEAD ")) {
-                    currentSha = line.substring("HEAD ".length)
-                } else if (line.startsWith("branch ")) {
-                    currentBranch = line.substring("branch ".length).removePrefix("refs/heads/")
                 }
-                line = reader.readLine()
+                if (currentPath.isNotEmpty()) {
+                    result.add(createWorktreeObj(currentPath, currentSha, currentBranch))
+                }
             }
-            if (currentPath.isNotEmpty()) {
-                result.add(createWorktreeObj(currentPath, currentSha, currentBranch))
-            }
-            
+
             process.waitFor()
         } catch (e: Exception) {
-            e.printStackTrace()
+            logger.warn("Failed to list git worktrees", e)
         }
-        
+
         return result
     }
 
@@ -274,52 +308,57 @@ class WorktreeService(private val project: Project) {
         return WorktreeInfo(path, sha, branch, name)
     }
 
-    fun getBranchName(worktreePath: String): String {
-        return runCommand(worktreePath, listOf("git", "branch", "--show-current"))
-    }
+    fun getBranchName(worktreePath: String): String =
+        runCommand(worktreePath, listOf("git", "branch", "--show-current"))
 
-    fun getDiffShortstat(worktreePath: String): String {
-        return runCommand(worktreePath, listOf("git", "diff", "--shortstat"))
-    }
+    fun getDiffShortstat(worktreePath: String): String =
+        runCommand(worktreePath, listOf("git", "diff", "--shortstat"))
 
-    fun getModifiedFiles(worktreePath: String): List<String> {
-        val output = runCommand(worktreePath, listOf("git", "diff", "--name-only"))
-        return output.split("\\n").filter { it.isNotBlank() }
-    }
+    fun getModifiedFiles(worktreePath: String): List<String> =
+        runCommand(worktreePath, listOf("git", "diff", "--name-only"))
+            .split("\\n").filter { it.isNotBlank() }
 
     fun removeWorktree(worktreePath: String) {
         val rootPath = project.basePath ?: return
         try {
             val process = ProcessBuilder("git", "worktree", "remove", worktreePath)
                 .directory(File(rootPath))
+                .redirectErrorStream(true)
                 .start()
+            // Drain the output so the process never blocks on a full pipe.
+            process.inputStream.bufferedReader().use { it.readText() }
             process.waitFor()
         } catch (e: Exception) {
-            e.printStackTrace()
+            logger.warn("Failed to remove worktree: $worktreePath", e)
         }
     }
 
+    /**
+     * Runs a git command and returns its trimmed output (stderr merged into stdout).
+     * The stream is fully consumed and closed to avoid pipe-buffer deadlocks.
+     */
     private fun runCommand(workingDir: String, command: List<String>): String {
         return try {
             val process = ProcessBuilder(command)
                 .directory(File(workingDir))
+                .redirectErrorStream(true)
                 .start()
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            val output = reader.readText().trim()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
             process.waitFor()
-            output
+            output.trim()
         } catch (e: Exception) {
+            logger.warn("Command failed: \${command.joinToString(" ")}", e)
             ""
         }
     }
 }
-`
+`,
   },
   {
-    name: 'DiffReviewAction.kt',
-    path: 'src/main/kotlin/com/example/worktree/actions/DiffReviewAction.kt',
-    language: 'kotlin',
-    description: 'Action triggering Android Studio native side-by-side Diff window on any target file in a separate worktree.',
+    name: "DiffReviewAction.kt",
+    path: "src/main/kotlin/com/example/worktree/actions/DiffReviewAction.kt",
+    language: "kotlin",
+    description: "Opens Android Studio’s native side-by-side diff window for a file in a separate worktree.",
     content: `package com.example.worktree.actions
 
 import com.intellij.openapi.actionSystem.AnAction
@@ -340,6 +379,14 @@ class DiffReviewAction(
 ) : AnAction() {
 
     override fun actionPerformed(e: AnActionEvent) {
+        showDiff()
+    }
+
+    /**
+     * Opens the native side-by-side diff (left: Main repository, right: Worktree).
+     * Callable directly from UI code that has no AnActionEvent. Must run on the EDT.
+     */
+    fun showDiff() {
         val originalVf: VirtualFile? = LocalFileSystem.getInstance()
             .refreshAndFindFileByIoFile(mainOriginalFile)
         val modifiedVf: VirtualFile? = LocalFileSystem.getInstance()
@@ -365,6 +412,32 @@ class DiffReviewAction(
         DiffManager.getInstance().showDiff(project, diffRequest)
     }
 }
-`
+`,
+  },
+  {
+    name: "ToggleWorktreesAction.kt",
+    path: "src/main/kotlin/com/example/worktree/actions/ToggleWorktreesAction.kt",
+    language: "kotlin",
+    description: "Action that shows/hides the Active Worktrees tool window (Alt+Shift+W).",
+    content: `package com.example.worktree.actions
+
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.wm.ToolWindowManager
+
+class ToggleWorktreesAction : AnAction() {
+    override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
+        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("Active Worktrees")
+        if (toolWindow != null) {
+            if (toolWindow.isVisible) {
+                toolWindow.hide(null)
+            } else {
+                toolWindow.show(null)
+            }
+        }
+    }
+}
+`,
   }
 ];
