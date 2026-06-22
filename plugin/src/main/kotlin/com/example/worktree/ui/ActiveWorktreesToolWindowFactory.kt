@@ -85,13 +85,18 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
         fun buildRequest(worktree: WorktreeInfo, relativePath: String): SimpleDiffRequest? {
             val basePath = project.basePath ?: return null
             val lfs = LocalFileSystem.getInstance()
-            val original = lfs.refreshAndFindFileByIoFile(File(basePath, relativePath)) ?: return null
-            val modified = lfs.refreshAndFindFileByIoFile(File(worktree.path, relativePath)) ?: return null
             val factory = DiffContentFactory.getInstance()
+            val originalVf = lfs.refreshAndFindFileByIoFile(File(basePath, relativePath))
+            val modifiedVf = lfs.refreshAndFindFileByIoFile(File(worktree.path, relativePath))
+            // A file may exist on only one side (added or deleted in the worktree);
+            // use empty content for the missing side instead of skipping the file.
+            if (originalVf == null && modifiedVf == null) return null
+            val original = if (originalVf != null) factory.create(project, originalVf) else factory.createEmpty()
+            val modified = if (modifiedVf != null) factory.create(project, modifiedVf) else factory.createEmpty()
             return SimpleDiffRequest(
                 relativePath,
-                factory.create(project, original),
-                factory.create(project, modified),
+                original,
+                modified,
                 "Main (Repository Home)",
                 "Worktree: ${worktree.name}"
             )
