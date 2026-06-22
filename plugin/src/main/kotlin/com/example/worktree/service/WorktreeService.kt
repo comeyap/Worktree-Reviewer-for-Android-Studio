@@ -78,7 +78,25 @@ class WorktreeService(private val project: Project) {
         runCommand(worktreePath, listOf("git", "branch", "--show-current"))
 
     fun getDiffShortstat(worktreePath: String): String =
-        runCommand(worktreePath, listOf("git", "diff", "--shortstat"))
+        runCommand(worktreePath, listOf("git", "diff", "HEAD", "--shortstat"))
+
+    /**
+     * Returns the HEAD (committed) version of a file in the worktree, or null if
+     * the file does not exist at HEAD (i.e. it was newly added in the worktree).
+     */
+    fun getFileAtHead(worktreePath: String, relativePath: String): String? {
+        return try {
+            val process = ProcessBuilder("git", "show", "HEAD:$relativePath")
+                .directory(File(worktreePath))
+                .start()
+            val output = process.inputStream.bufferedReader().use { it.readText() }
+            process.errorStream.bufferedReader().use { it.readText() }
+            if (process.waitFor() == 0) output else null
+        } catch (e: Exception) {
+            logger.warn("git show HEAD:$relativePath failed in $worktreePath", e)
+            null
+        }
+    }
 
     /** Parses `git diff --shortstat` into structured insertion/deletion counts. */
     fun getDiffStats(worktreePath: String): DiffStats {
@@ -90,7 +108,7 @@ class WorktreeService(private val project: Project) {
     }
 
     fun getModifiedFiles(worktreePath: String): List<String> =
-        runCommand(worktreePath, listOf("git", "diff", "--name-only"))
+        runCommand(worktreePath, listOf("git", "diff", "HEAD", "--name-only"))
             .split("\n").filter { it.isNotBlank() }
 
     fun removeWorktree(worktreePath: String) {

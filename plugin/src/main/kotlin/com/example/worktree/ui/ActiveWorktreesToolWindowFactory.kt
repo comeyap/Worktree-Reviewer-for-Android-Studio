@@ -83,22 +83,23 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
         }
 
         fun buildRequest(worktree: WorktreeInfo, relativePath: String): SimpleDiffRequest? {
-            val basePath = project.basePath ?: return null
-            val lfs = LocalFileSystem.getInstance()
             val factory = DiffContentFactory.getInstance()
-            val originalVf = lfs.refreshAndFindFileByIoFile(File(basePath, relativePath))
-            val modifiedVf = lfs.refreshAndFindFileByIoFile(File(worktree.path, relativePath))
-            // A file may exist on only one side (added or deleted in the worktree);
-            // use empty content for the missing side instead of skipping the file.
-            if (originalVf == null && modifiedVf == null) return null
-            val original = if (originalVf != null) factory.create(project, originalVf) else factory.createEmpty()
-            val modified = if (modifiedVf != null) factory.create(project, modifiedVf) else factory.createEmpty()
+            val lfs = LocalFileSystem.getInstance()
+            // Compare the worktree's own committed (HEAD) version against its current
+            // working-tree file, so only the uncommitted changes show up.
+            val workingVf = lfs.refreshAndFindFileByIoFile(File(worktree.path, relativePath))
+            val headText = service.getFileAtHead(worktree.path, relativePath)
+            // A file may exist on only one side (added or deleted since HEAD);
+            // use empty content for the missing side instead of skipping it.
+            if (workingVf == null && headText == null) return null
+            val headContent = if (headText != null) factory.create(project, headText, workingVf?.fileType) else factory.createEmpty()
+            val workingContent = if (workingVf != null) factory.create(project, workingVf) else factory.createEmpty()
             return SimpleDiffRequest(
                 relativePath,
-                original,
-                modified,
-                "Main (Repository Home)",
-                "Worktree: ${worktree.name}"
+                headContent,
+                workingContent,
+                "HEAD (${worktree.branch})",
+                "Working tree"
             )
         }
 
