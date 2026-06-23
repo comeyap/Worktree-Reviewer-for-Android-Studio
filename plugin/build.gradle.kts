@@ -4,7 +4,7 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.16.0"
 }
 
-group = "com.github.developer"
+group = "com.github.comeyap"
 version = "1.0.2"
 
 repositories {
@@ -23,7 +23,7 @@ dependencies {
 
 intellijPlatform {
     pluginConfiguration {
-        id.set("com.github.developer.aiworktreereviewer")
+        id.set("com.github.comeyap.aiworktreereviewer")
         name.set("AI Worktree Reviewer")
         version.set("1.0.2")
         

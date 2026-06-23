@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 <idea-plugin>
-    <id>com.github.developer.aiworktreereviewer</id>
+    <id>com.github.comeyap.aiworktreereviewer</id>
     <name>AI Worktree Reviewer</name>
     <vendor email="comeyap@gmail.com" url="https://github.com/comeyap/AI-Worktree-Reviewer-for-AndroidStudio-IntelliJ-">YoungJae Kim</vendor>
 
