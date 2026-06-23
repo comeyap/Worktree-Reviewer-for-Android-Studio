@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.github.developer.aiworktreereviewer</id>
     <name>AI Worktree Reviewer</name>
-    <vendor email="comeyap@gmail.com" url="https://github.com/comeyap/Worktree-Reviewer-for-Android-Studio">YoungJae Kim</vendor>
+    <vendor email="comeyap@gmail.com" url="https://github.com/comeyap/AI-Worktree-Reviewer-for-AndroidStudio-IntelliJ-">YoungJae Kim</vendor>
 
     <description><![CDATA[
     <h3>AI Worktree Reviewer for Android Studio / IntelliJ</h3>
