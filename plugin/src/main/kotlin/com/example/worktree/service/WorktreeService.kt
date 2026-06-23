@@ -141,17 +141,32 @@ class WorktreeService(private val project: Project) {
     }
 
     /**
-     * Runs a git command and returns its trimmed output (stderr merged into stdout).
-     * The stream is fully consumed and closed to avoid pipe-buffer deadlocks.
+     * Runs a git command and returns its trimmed standard output.
+     *
+     * stdout and stderr are kept on separate streams (stderr drained on a worker
+     * thread to avoid a pipe-buffer deadlock), so a chatty or failing git process
+     * — e.g. a missing git-lfs filter printing "git-lfs: command not found" /
+     * "fatal: the remote end hung up unexpectedly" — never leaks its diagnostics
+     * into the parsed output, where they would otherwise appear as bogus
+     * "changed files".
      */
     private fun runCommand(workingDir: String, command: List<String>): String {
         return try {
             val process = ProcessBuilder(command)
                 .directory(File(workingDir))
-                .redirectErrorStream(true)
                 .start()
+            val errText = StringBuilder()
+            val errThread = Thread {
+                process.errorStream.bufferedReader().use { reader ->
+                    reader.forEachLine { errText.appendLine(it) }
+                }
+            }.apply { isDaemon = true; start() }
             val output = process.inputStream.bufferedReader().use { it.readText() }
-            process.waitFor()
+            val exitCode = process.waitFor()
+            errThread.join()
+            if (exitCode != 0 && errText.isNotBlank()) {
+                logger.warn("Command exited $exitCode: ${command.joinToString(" ")}\n${errText.toString().trim()}")
+            }
             output.trim()
         } catch (e: Exception) {
             logger.warn("Command failed: ${command.joinToString(" ")}", e)

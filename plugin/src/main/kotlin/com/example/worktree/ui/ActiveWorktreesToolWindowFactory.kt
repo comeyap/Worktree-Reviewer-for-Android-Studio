@@ -55,6 +55,7 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
         val filesModel = DefaultListModel<String>()
         val filesList = JBList(filesModel).apply {
             selectionMode = ListSelectionModel.SINGLE_SELECTION
+            emptyText.text = "Select a worktree to see its changed files"
             cellRenderer = SimpleListCellRenderer.create { label, value, _ ->
                 if (value != null) {
                     label.text = value
@@ -133,15 +134,21 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
         fun loadFilesFor(worktree: WorktreeInfo) {
             filesModel.clear()
             reviewAllButton.isEnabled = false
+            // Show a "Loading…" placeholder instead of the default "Nothing to show"
+            // while the changed-file list is fetched off the EDT.
+            filesList.emptyText.text = "Loading changed files…"
             app.executeOnPooledThread {
                 val files = service.getModifiedFiles(worktree.path)
                 val stats = service.getDiffStats(worktree.path)
                 app.invokeLater {
                     statsByPath[worktree.path] = stats
                     worktreeList.repaint()
+                    // Drop stale results if the user already moved to another worktree.
+                    if (worktreeList.selectedValue?.path != worktree.path) return@invokeLater
                     filesModel.clear()
                     files.forEach { filesModel.addElement(it) }
                     reviewAllButton.isEnabled = files.isNotEmpty()
+                    filesList.emptyText.text = if (files.isEmpty()) "No uncommitted changes" else "Nothing to show"
                 }
             }
         }
@@ -157,6 +164,7 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
                     worktreeModel.clear()
                     worktrees.forEach { worktreeModel.addElement(it) }
                     filesModel.clear()
+                    filesList.emptyText.text = "Select a worktree to see its changed files"
                     reviewAllButton.isEnabled = false
                     openButton.isEnabled = false
                     deleteButton.isEnabled = false
