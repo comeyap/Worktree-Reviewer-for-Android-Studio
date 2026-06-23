@@ -103,13 +103,14 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
             }
         }
 
-        fun buildRequest(worktree: WorktreeInfo, relativePath: String): SimpleDiffRequest? {
+        // Builds a diff request from an already-fetched HEAD text (so the slow
+        // `git show` runs off the EDT in the caller). Compares the worktree's
+        // committed (HEAD) version against its working-tree file, so only the
+        // uncommitted changes show up.
+        fun buildRequest(worktree: WorktreeInfo, relativePath: String, headText: String?): SimpleDiffRequest? {
             val factory = DiffContentFactory.getInstance()
             val lfs = LocalFileSystem.getInstance()
-            // Compare the worktree's own committed (HEAD) version against its current
-            // working-tree file, so only the uncommitted changes show up.
             val workingVf = lfs.refreshAndFindFileByIoFile(File(worktree.path, relativePath))
-            val headText = service.getFileAtHead(worktree.path, relativePath)
             // A file may exist on only one side (added or deleted since HEAD);
             // use empty content for the missing side instead of skipping it.
             if (workingVf == null && headText == null) return null
@@ -124,16 +125,28 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
             )
         }
 
-        fun openSingleDiff(worktree: WorktreeInfo, relativePath: String) {
-            val request = buildRequest(worktree, relativePath) ?: return
-            showDiff("${worktree.path}\n${relativePath}", listOf(request), relativePath)
+        // Fetches each file's HEAD version off the EDT (the slow `git show`),
+        // showing the loading spinner over the file list while the diff is
+        // prepared, then opens the diff tab on the EDT.
+        fun openDiffsFor(worktree: WorktreeInfo, files: List<String>, key: String, title: String) {
+            if (files.isEmpty()) return
+            filesLoadingPanel.startLoading()
+            app.executeOnPooledThread {
+                val heads = files.associateWith { service.getFileAtHead(worktree.path, it) }
+                app.invokeLater {
+                    val requests = files.mapNotNull { buildRequest(worktree, it, heads[it]) }
+                    filesLoadingPanel.stopLoading()
+                    showDiff(key, requests, title)
+                }
+            }
         }
 
+        fun openSingleDiff(worktree: WorktreeInfo, relativePath: String) =
+            openDiffsFor(worktree, listOf(relativePath), "${worktree.path}\n${relativePath}", relativePath)
+
         // Opens every changed file in the one diff tab; page through with prev/next.
-        fun reviewAll(worktree: WorktreeInfo, files: List<String>) {
-            val requests = files.mapNotNull { buildRequest(worktree, it) }
-            showDiff("${worktree.path}\nALL", requests, "${worktree.name} — all changes")
-        }
+        fun reviewAll(worktree: WorktreeInfo, files: List<String>) =
+            openDiffsFor(worktree, files, "${worktree.path}\nALL", "${worktree.name} — all changes")
 
         // Loads the changed files for a worktree; also refreshes its +/- badge.
         // Called on every worktree click so the view reflects the latest git state.
