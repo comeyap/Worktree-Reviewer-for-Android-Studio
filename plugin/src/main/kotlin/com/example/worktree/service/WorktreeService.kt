@@ -128,34 +128,22 @@ class WorktreeService(private val project: Project) {
 
     /**
      * All files with uncommitted changes vs HEAD, INCLUDING untracked (new)
-     * files. Uses `git status --porcelain` rather than `git diff HEAD`, because
-     * `git diff` omits untracked files entirely; `--untracked-files=all` also
-     * lists individual files inside newly created (untracked) directories.
+     * files. Built from the SAME sources as [getDiffStats] so the file list and
+     * the +/- badge can never disagree: tracked changes from
+     * `git diff HEAD --name-only` plus untracked files from `git ls-files
+     * --others`. (`git diff` alone omits untracked files; `git status
+     * --untracked-files=all` would include them but is heavy on a large repo
+     * and can return nothing while the index is locked by another git process.)
      */
-    fun getModifiedFiles(worktreePath: String): List<String> =
-        runCommand(worktreePath, listOf("git", "status", "--porcelain", "--untracked-files=all"))
+    fun getModifiedFiles(worktreePath: String): List<String> {
+        val tracked = runCommand(worktreePath, listOf("git", "diff", "HEAD", "--name-only"))
             .split("\n").filter { it.isNotBlank() }
-            .mapNotNull { statusLineToPath(it) }
-            .distinct()
+        return (tracked + getUntrackedFiles(worktreePath)).distinct()
+    }
 
     private fun getUntrackedFiles(worktreePath: String): List<String> =
         runCommand(worktreePath, listOf("git", "ls-files", "--others", "--exclude-standard"))
             .split("\n").filter { it.isNotBlank() }
-
-    /** Extracts the file path from a `git status --porcelain` line. */
-    private fun statusLineToPath(line: String): String? {
-        if (line.length < 4) return null
-        // "XY <path>" or, for renames/copies, "XY <orig> -> <path>".
-        var path = line.substring(3)
-        val arrow = path.indexOf(" -> ")
-        if (arrow >= 0) path = path.substring(arrow + 4)
-        path = path.trim()
-        // git quotes paths that contain special characters.
-        if (path.length >= 2 && path.startsWith("\"") && path.endsWith("\"")) {
-            path = path.substring(1, path.length - 1)
-        }
-        return path.ifBlank { null }
-    }
 
     private fun countLines(file: File): Int = try {
         file.bufferedReader().use { reader ->

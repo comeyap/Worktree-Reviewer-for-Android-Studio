@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.github.comeyap"
-version = "1.0.8"
+version = "1.0.9"
 
 repositories {
     mavenCentral()
@@ -25,7 +25,7 @@ intellijPlatform {
     pluginConfiguration {
         id.set("com.github.comeyap.aiworktreereviewer")
         name.set("AI Worktree Reviewer")
-        version.set("1.0.8")
+        version.set("1.0.9")
 
         ideaVersion {
             sinceBuild.set("241")
