@@ -1,0 +1,19 @@
+<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="4" y1="2" x2="36" y2="38" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5B8DEF"/>
+      <stop offset="1" stop-color="#7B5BFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="40" height="40" rx="9" fill="url(#bg)"/>
+  <!-- git-branch symbol: a main line with a branch merging into it -->
+  <g stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" fill="none">
+    <path d="M14 13 V27"/>
+    <path d="M26 13 C26 20.6 22 20.8 14 20.8"/>
+  </g>
+  <g fill="#FFFFFF">
+    <circle cx="14" cy="13" r="3.4"/>
+    <circle cx="14" cy="27" r="3.4"/>
+    <circle cx="26" cy="13" r="3.4"/>
+  </g>
+</svg>
