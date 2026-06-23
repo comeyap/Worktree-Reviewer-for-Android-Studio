@@ -5,13 +5,17 @@
     <vendor email="comeyap@gmail.com" url="https://github.com/comeyap/AI-Worktree-Reviewer-for-AndroidStudio-IntelliJ-">YoungJae Kim</vendor>
 
     <description><![CDATA[
-    <h3>AI Worktree Reviewer for Android Studio / IntelliJ</h3>
-    <p>A lightweight review companion plugin designed strictly for Git Worktree multi-session repositories.</p>
+    <h3>AI Worktree Reviewer</h3>
+    <p>Review changes across multiple Git worktrees without leaving your editor &mdash;
+    built for the era of AI coding agents that work several branches in parallel.</p>
     <ul>
-        <li>Quickly toggle active worktrees from a central dock</li>
-        <li>Review diff modifications with zero workspace context switches</li>
-        <li>Perform seamless reviews with sequential file traversal (Next/Previous hooks)</li>
+        <li>Active Worktrees tool window that lists every worktree with +/- change badges</li>
+        <li>Browse a worktree's uncommitted changes and open side-by-side HEAD vs working-tree diffs</li>
+        <li>Review every changed file in a single diff tab</li>
+        <li>Open a worktree as a project, or remove it &mdash; all from one panel</li>
+        <li>Toggle the panel with Alt+Shift+W</li>
     </ul>
+    <p>All git calls run on a background thread, so the IDE UI never freezes.</p>
     ]]></description>
 
     <!-- Depends on platform and git plugins -->
