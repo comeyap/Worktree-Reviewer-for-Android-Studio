@@ -21,6 +21,7 @@ import com.intellij.ui.JBSplitter
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
+import com.intellij.ui.components.JBLoadingPanel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
@@ -70,6 +71,11 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
         val openButton = JButton("Open in IDE").apply { isEnabled = false }
         val deleteButton = JButton("Delete").apply { isEnabled = false }
 
+        // Spinner overlays shown over each list while its git data is fetched
+        // off the EDT (a rotating "loading" icon, not just placeholder text).
+        val worktreeLoadingPanel = JBLoadingPanel(BorderLayout(), toolWindow.disposable)
+        val filesLoadingPanel = JBLoadingPanel(BorderLayout(), toolWindow.disposable)
+
         // ----- Diff helpers -----
         // Reuse a single diff editor tab: close the previous one before opening a
         // new one, so navigating files never stacks duplicate diff windows/tabs.
@@ -97,13 +103,14 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
             }
         }
 
-        fun buildRequest(worktree: WorktreeInfo, relativePath: String): SimpleDiffRequest? {
+        // Builds a diff request from an already-fetched HEAD text (so the slow
+        // `git show` runs off the EDT in the caller). Compares the worktree's
+        // committed (HEAD) version against its working-tree file, so only the
+        // uncommitted changes show up.
+        fun buildRequest(worktree: WorktreeInfo, relativePath: String, headText: String?): SimpleDiffRequest? {
             val factory = DiffContentFactory.getInstance()
             val lfs = LocalFileSystem.getInstance()
-            // Compare the worktree's own committed (HEAD) version against its current
-            // working-tree file, so only the uncommitted changes show up.
             val workingVf = lfs.refreshAndFindFileByIoFile(File(worktree.path, relativePath))
-            val headText = service.getFileAtHead(worktree.path, relativePath)
             // A file may exist on only one side (added or deleted since HEAD);
             // use empty content for the missing side instead of skipping it.
             if (workingVf == null && headText == null) return null
@@ -118,43 +125,60 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
             )
         }
 
-        fun openSingleDiff(worktree: WorktreeInfo, relativePath: String) {
-            val request = buildRequest(worktree, relativePath) ?: return
-            showDiff("${worktree.path}\n${relativePath}", listOf(request), relativePath)
+        // Fetches each file's HEAD version off the EDT (the slow `git show`),
+        // showing the loading spinner over the file list while the diff is
+        // prepared, then opens the diff tab on the EDT.
+        fun openDiffsFor(worktree: WorktreeInfo, files: List<String>, key: String, title: String) {
+            if (files.isEmpty()) return
+            filesLoadingPanel.startLoading()
+            app.executeOnPooledThread {
+                val heads = files.associateWith { service.getFileAtHead(worktree.path, it) }
+                app.invokeLater {
+                    val requests = files.mapNotNull { buildRequest(worktree, it, heads[it]) }
+                    filesLoadingPanel.stopLoading()
+                    showDiff(key, requests, title)
+                }
+            }
         }
 
+        fun openSingleDiff(worktree: WorktreeInfo, relativePath: String) =
+            openDiffsFor(worktree, listOf(relativePath), "${worktree.path}\n${relativePath}", relativePath)
+
         // Opens every changed file in the one diff tab; page through with prev/next.
-        fun reviewAll(worktree: WorktreeInfo, files: List<String>) {
-            val requests = files.mapNotNull { buildRequest(worktree, it) }
-            showDiff("${worktree.path}\nALL", requests, "${worktree.name} — all changes")
-        }
+        fun reviewAll(worktree: WorktreeInfo, files: List<String>) =
+            openDiffsFor(worktree, files, "${worktree.path}\nALL", "${worktree.name} — all changes")
 
         // Loads the changed files for a worktree; also refreshes its +/- badge.
         // Called on every worktree click so the view reflects the latest git state.
         fun loadFilesFor(worktree: WorktreeInfo) {
             filesModel.clear()
             reviewAllButton.isEnabled = false
-            // Show a "Loading…" placeholder instead of the default "Nothing to show"
-            // while the changed-file list is fetched off the EDT.
+            // Show a spinner over the list while the changed files are fetched
+            // off the EDT (plus a placeholder for the empty state).
             filesList.emptyText.text = "Loading changed files…"
+            filesLoadingPanel.startLoading()
             app.executeOnPooledThread {
                 val files = service.getModifiedFiles(worktree.path)
                 val stats = service.getDiffStats(worktree.path)
                 app.invokeLater {
                     statsByPath[worktree.path] = stats
                     worktreeList.repaint()
-                    // Drop stale results if the user already moved to another worktree.
+                    // Drop stale results if the user already moved to another
+                    // worktree; the newer load owns the spinner and will stop it.
                     if (worktreeList.selectedValue?.path != worktree.path) return@invokeLater
                     filesModel.clear()
                     files.forEach { filesModel.addElement(it) }
                     reviewAllButton.isEnabled = files.isNotEmpty()
                     filesList.emptyText.text = if (files.isEmpty()) "No uncommitted changes" else "Nothing to show"
+                    filesLoadingPanel.stopLoading()
                 }
             }
         }
 
         fun reloadWorktrees() {
             refreshButton.isEnabled = false
+            // Spinner over the worktree list while it is (re)loaded off the EDT.
+            worktreeLoadingPanel.startLoading()
             app.executeOnPooledThread {
                 val worktrees = service.getWorktrees()
                 val stats = worktrees.associate { it.path to service.getDiffStats(it.path) }
@@ -169,6 +193,7 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
                     openButton.isEnabled = false
                     deleteButton.isEnabled = false
                     refreshButton.isEnabled = true
+                    worktreeLoadingPanel.stopLoading()
                 }
             }
         }
@@ -276,7 +301,7 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
             border = JBUI.Borders.emptyBottom(5)
         }
 
-        val worktreePanel = JPanel(BorderLayout()).apply {
+        val worktreePanel = worktreeLoadingPanel.apply {
             add(JBScrollPane(worktreeList), BorderLayout.CENTER)
         }
 
@@ -285,9 +310,10 @@ class ActiveWorktreesToolWindowFactory : ToolWindowFactory {
             add(JBLabel("Changed files (double-click to diff)"), BorderLayout.NORTH)
             add(JPanel(FlowLayout(FlowLayout.LEFT, 2, 0)).apply { add(reviewAllButton) }, BorderLayout.CENTER)
         }
+        filesLoadingPanel.add(JBScrollPane(filesList), BorderLayout.CENTER)
         val filesPanel = JPanel(BorderLayout()).apply {
             add(filesHeader, BorderLayout.NORTH)
-            add(JBScrollPane(filesList), BorderLayout.CENTER)
+            add(filesLoadingPanel, BorderLayout.CENTER)
         }
         val splitter = JBSplitter(true, 0.5f).apply {
             firstComponent = worktreePanel
