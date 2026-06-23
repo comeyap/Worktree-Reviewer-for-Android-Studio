@@ -44,7 +44,7 @@ diff** — in a single panel, so you can review parallel work at a glance.
 
 ## Requirements
 
-- **IntelliJ IDEA** or **Android Studio**, build `2024.1`–`2024.2` (since-build `241`, until-build `242.*`)
+- **IntelliJ IDEA** or **Android Studio**, build `2024.1` or newer (since-build `241`, no upper bound)
 - The bundled **Git4Idea** plugin (enabled by default)
 
 ## Installation
@@ -61,7 +61,7 @@ diff** — in a single panel, so you can review parallel work at a glance.
 
 ```bash
 cd plugin
-./gradlew buildPlugin      # → plugin/build/distributions/aiworktreereviewer-1.0.0.zip
+./gradlew buildPlugin      # → plugin/build/distributions/aiworktreereviewer-<version>.zip
 ```
 
 Then install the produced ZIP via Option A, step 3. To launch a sandbox IDE with
