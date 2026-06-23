@@ -1,6 +1,6 @@
 # AI Worktree Reviewer
 
-![Build](https://github.com/comeyap/AI-Worktree-Reviewer-for-AndroidStudio-IntelliJ-/actions/workflows/build-plugin.yml/badge.svg)
+![Build](https://github.com/comeyap/AI-Worktree-Reviewer-for-AndroidStudio-IntelliJ/actions/workflows/build-plugin.yml/badge.svg)
 
 > A JetBrains IDE plugin for reviewing changes across multiple Git worktrees
 > without leaving your editor — built for the era of AI coding agents that work
@@ -58,7 +58,7 @@ diff** — in a single panel, so you can review parallel work at a glance.
 ### Option A — Install the release ZIP (recommended)
 
 1. Download `aiworktreereviewer-*.zip` from the
-   [Releases](https://github.com/comeyap/AI-Worktree-Reviewer-for-AndroidStudio-IntelliJ-/releases) page.
+   [Releases](https://github.com/comeyap/AI-Worktree-Reviewer-for-AndroidStudio-IntelliJ/releases) page.
 2. In your IDE, open **Settings/Preferences → Plugins**.
 3. Click the gear icon (⚙️) → **Install Plugin from Disk…** and select the downloaded `.zip`.
 4. Restart the IDE. The **Active Worktrees** tool window appears in the right dock.
